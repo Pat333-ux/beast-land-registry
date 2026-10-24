@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract LandRegistry {
+    struct Parcel {
+        uint256 parcelId;
+        address owner;
+        string legalDescriptionHash;
+        string physicalLocation;
+        bool active;
+    }
+
+    mapping(uint256 => Parcel) public parcels;
+    mapping(address => uint256[]) public ownerParcels;
+    uint256 public parcelCounter;
+
+    event ParcelRegistered(uint256 indexed parcelId, address indexed owner, string physicalLocation);
+    event ParcelTransferred(uint256 indexed parcelId, address indexed oldOwner, address indexed newOwner);
+
+    function registerParcel(string calldata _legalDescriptionHash, string calldata _physicalLocation) external {
+        parcelCounter++;
+        parcels[parcelCounter] = Parcel({
+            parcelId: parcelCounter,
+            owner: msg.sender,
+            legalDescriptionHash: _legalDescriptionHash,
+            physicalLocation: _physicalLocation,
+            active: true
+        });
+        ownerParcels[msg.sender].push(parcelCounter);
+        emit ParcelRegistered(parcelCounter, msg.sender, _physicalLocation);
+    }
+
+    function transferParcel(uint256 _parcelId, address _newOwner) external {
+        Parcel storage parcel = parcels[_parcelId];
+        require(parcel.active, "Parcel not active");
+        require(msg.sender == parcel.owner, "Only current owner can transfer");
+        require(_newOwner != address(0), "Invalid new owner address");
+
+        address previousOwner = parcel.owner;
+        parcel.owner = _newOwner;
+
+        ownerParcels[_newOwner].push(_parcelId);
+        // Note: Production index cleanup for previousOwner can be handled off-chain or via array filtering
+
+        emit ParcelTransferred(_parcelId, previousOwner, _newOwner);
+    }
+}
